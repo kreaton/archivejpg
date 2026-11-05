@@ -1,0 +1,17 @@
+[package]
+name = "archivejpg"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+chrono = "0.4.45"
+clap = { version = "4.6.7", features = ["derive"] }
+csv = "1.4.0"
+dunce = "1.0.5"
+filetime = "0.2.29"
+kamadak-exif = "0.6.1"
+little_exif = "0.6.23"
+sha2 = "0.11.1"
+uuid = { version = "1.28.0", features = ["v4"] }
+walkdir = "2.5.0"
