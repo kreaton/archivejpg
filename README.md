@@ -4,6 +4,7 @@ A command-line tool that copies JPEG photos from a messy folder tree into a tidy
 
 ```text
 archive/
+├── archive-log.csv
 ├── manifest-20261105162620.csv
 └── 2004/
     └── 09/
@@ -20,6 +21,7 @@ Photo collections tend to spread across old drives, phone backups and folders na
 - **Runs are repeatable.** Photos that are already archived are skipped, so you can run it again whenever new photos arrive.
 - **Nothing is overwritten.** If a different photo already has the same name, the new one is stored under a new name.
 - **Every run is recorded.** A CSV manifest lists what happened to each photo.
+- **Every copy is logged.** One CSV log details all copied files, with their file and EXIF data.
 
 ## Build
 
@@ -65,6 +67,7 @@ duplicate sub\a-copy.jpg -> 2004\09\25\a.jpg (archived from a.jpg)
 
 Done: 1 copied, 0 copied with new name, 0 skipped (already archived), 1 duplicates, 0 failed
 Manifest: E:\Archive\manifest-20261105162620.csv
+Log: E:\Archive\archive-log.csv
 ```
 
 ## How it works
@@ -111,6 +114,35 @@ Each run creates a new `manifest-YYYYMMDDHHMMSS.csv` in the target root, even if
 | `metadata` | Embedding methods that were applied |
 | `note` | Details, such as why an embedding was not applied |
 
+### The log
+
+`archive-log.csv` in the target root has one row for every file copied, including those stored under a new name. Unlike the manifests, it is a single file that grows across runs, and skipped, duplicate and failed photos aren't in it. Photos copied before the log existed aren't added to it.
+
+Later runs don't read the log, so you can delete it or move it. A new one is started on the next run. If it is open in a program that locks it, such as Excel, the run stops with a message before copying anything.
+
+| Column | Content |
+| --- | --- |
+| `copied_at` | When the photo was copied |
+| `status` | `copied` or `renamed` |
+| `source_root`, `source_path` | Absolute source directory, and the photo's path relative to it |
+| `target_path` | Path of the archived copy, relative to the target root |
+| `size`, `target_size` | Size in bytes of the original and of the copy (they differ after embedding) |
+| `source_created`, `source_modified` | File dates of the original |
+| `sha256`, `target_sha256` | SHA-256 hash of the original and of the copy (they differ after embedding) |
+| `embedded_metadata` | Embedding methods that were applied |
+| `exif_date_time_original`, `exif_date_time_digitized`, `exif_date_time`, `exif_offset_time_original` | Dates |
+| `exif_make`, `exif_model`, `exif_lens_model`, `exif_software` | Equipment |
+| `exif_orientation`, `exif_width`, `exif_height` | Picture |
+| `exif_exposure_time`, `exif_f_number`, `exif_iso`, `exif_focal_length`, `exif_flash` | Exposure |
+| `exif_artist`, `exif_copyright`, `exif_image_description` | Descriptions |
+| `exif_gps_latitude`, `exif_gps_longitude` | Position as signed decimal degrees (south and west are negative) |
+| `exif_gps_altitude` | Altitude as stored in the photo |
+| `exif_all` | Every EXIF field of the photo as `Tag=value; Tag=value`, leaving out binary values over 64 bytes such as maker notes |
+
+The EXIF columns describe the original and are empty if it has no readable EXIF data. A problem writing a row is shown as a warning and in the manifest's `note` column, and the photo still counts as copied.
+
+**The log can contain private details.** With GPS data, it lists where your photos were taken, in one easily shared file.
+
 ### Origin metadata
 
 The options store the source path, the original's hash and size, and the source root and archive time, so the origin can travel with the photo:
@@ -153,4 +185,4 @@ Don't run `exifsync --update` on the archive alone. If that changes the modified
 cargo test
 ```
 
-The tests generate their own minimal JPEG, so they need no sample photos.
+The tests generate their own minimal JPEGs, so they need no sample photos. The tests in `tests/log.rs` run the real program on them and check the log.

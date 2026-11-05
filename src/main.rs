@@ -1,3 +1,4 @@
+mod log;
 mod manifest;
 mod metadata;
 
@@ -14,6 +15,7 @@ use filetime::FileTime;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
+use log::CopyLog;
 use manifest::{Entry, Index, Manifest, Row};
 use metadata::Origin;
 
@@ -53,6 +55,7 @@ struct Archiver {
     source: PathBuf,
     target: PathBuf,
     index: Index,
+    log: CopyLog,
     /// Date folders already scanned into the index during this run.
     indexed_dirs: HashSet<PathBuf>,
     started: String,
@@ -70,6 +73,7 @@ fn main() -> Result<()> {
     let source = dunce::canonicalize(&args.source)?;
     let target = dunce::canonicalize(&args.target)?;
     let index = Index::load(&target)?;
+    let log = CopyLog::open(&target)?;
     // A run within the same second as the previous one waits for a fresh name.
     let mut now = Local::now();
     while target.join(manifest_name(now)).exists() {
@@ -82,6 +86,7 @@ fn main() -> Result<()> {
         source: source.clone(),
         target: target.clone(),
         index,
+        log,
         indexed_dirs: HashSet::new(),
         started: now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
     };
@@ -143,6 +148,7 @@ fn main() -> Result<()> {
         stats.copied, stats.renamed, stats.skipped, stats.duplicate, stats.failed
     );
     println!("Manifest: {}", manifest.path.display());
+    println!("Log: {}", archiver.log.path.display());
     if stats.failed > 0 {
         std::process::exit(1);
     }
@@ -152,7 +158,8 @@ fn main() -> Result<()> {
 impl Archiver {
     fn process(&mut self, src: &Path) -> Result<Row> {
         let data = fs::read(src)?;
-        let mtime = fs::metadata(src)?.modified()?;
+        let source_meta = fs::metadata(src)?;
+        let mtime = source_meta.modified()?;
         let size = data.len() as u64;
         let sha = sha256_hex(&data);
         let rel = rel_str(src, &self.source);
@@ -219,7 +226,7 @@ impl Archiver {
             size,
             archived_at: self.started.clone(),
         };
-        let (bytes, applied, notes) = self.with_metadata(data, &origin);
+        let (bytes, applied, notes) = self.with_metadata(data.clone(), &origin);
         fs::write(&final_dest, &bytes)
             .with_context(|| format!("cannot write {}", final_dest.display()))?;
         filetime::set_file_mtime(&final_dest, FileTime::from_system_time(mtime))?;
@@ -234,10 +241,33 @@ impl Archiver {
         }
 
         let target_rel = rel_str(&final_dest, &self.target);
+        let embedded = applied.join(";");
+        let details = log::FileDetails {
+            copied_at: &Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            status,
+            source_root: &origin.source_root,
+            source_path: &rel,
+            target_path: &target_rel,
+            size,
+            target_size: bytes.len() as u64,
+            source_created: &source_meta.created().map_or_else(|_| String::new(), |t| {
+                DateTime::<Local>::from(t).format("%Y-%m-%d %H:%M:%S").to_string()
+            }),
+            source_modified: &row.modified,
+            sha256: &sha,
+            target_sha256: &sha256_hex(&bytes),
+            embedded_metadata: &embedded,
+        };
+        // The photo is already safely copied, so a log problem doesn't fail it.
+        if let Err(e) = self.log.write(&details, &data) {
+            eprintln!("warning: cannot write to {}: {e:#}", self.log.path.display());
+            notes.push(format!("not in {}: {e:#}", log::FILE_NAME));
+        }
+
         self.index.add(&target_rel, Entry { sha256: sha, size, source_path: Some(rel) });
         row.status = status;
         row.target_path = target_rel;
-        row.metadata = applied.join(";");
+        row.metadata = embedded;
         row.note = notes.join("; ");
         Ok(row)
     }
