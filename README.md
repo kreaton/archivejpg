@@ -1,5 +1,7 @@
 # archivejpg
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A command-line tool that copies JPEG photos from a messy folder tree into a tidy archive organised by capture date, and records where every photo came from.
 
 ```text
@@ -186,3 +188,9 @@ cargo test
 ```
 
 The tests generate their own minimal JPEGs, so they need no sample photos. The tests in `tests/log.rs` run the real program on them and check the log.
+
+## License & Authorship
+
+This project is distributed under the terms of the [MIT License](LICENSE).
+
+**AI authorship note:** Most of the source code in this repository was generated with AI coding agents (Claude Code), under my direction and review. Purely AI-generated material may not be eligible for copyright protection in some jurisdictions. To the extent any part of this project is protected by copyright, it is licensed under the MIT License, and the license's warranty and liability disclaimers apply to the project as a whole.
