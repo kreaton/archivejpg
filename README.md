@@ -1,6 +1,9 @@
 # archivejpg
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/kreaton/archivejpg?style=flat&logo=github&color=yellow)](https://github.com/kreaton/archivejpg/stargazers)
+
+⭐ If archivejpg earns a place on your machine, [star it on GitHub](https://github.com/kreaton/archivejpg) — it's free, made by one developer, and stars are how other people find it.
 
 A command-line tool that copies JPEG photos from a messy folder tree into a tidy archive organised by capture date, and records where every photo came from.
 
